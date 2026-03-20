@@ -1,0 +1,26 @@
+{
+  "validation": {
+    "accuracy": 0.9619,
+    "precision": 0.9712,
+    "recall": 0.9401,
+    "f1": 0.9554,
+    "roc_auc": 0.9942,
+    "size": 19482
+  },
+  "test": {
+    "accuracy": 0.9639,
+    "precision": 0.9731,
+    "recall": 0.9431,
+    "f1": 0.9578,
+    "roc_auc": 0.9942,
+    "size": 19482
+  },
+  "dataset": {
+    "rows": 129880,
+    "features": 22,
+    "train_size": 90916,
+    "validation_size": 19482,
+    "test_size": 19482,
+    "duplicates_removed": 0
+  }
+}
