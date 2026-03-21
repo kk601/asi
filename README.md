@@ -19,7 +19,7 @@ python -m pip install -r requirements.txt
 1. Zaladuj dane do SQLite:
 
 ```powershell
-python scripts/load_airline_data_to_sqlite.py --source "D:\PRACA\asi\info\airline_passenger_satisfaction.csv"
+python scripts/load_airline_data_to_sqlite.py --source "airline_passenger_satisfaction.csv"
 ```
 
 2. Wylicz baseline i zapisz metryki:
