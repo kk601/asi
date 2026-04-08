@@ -34,6 +34,21 @@ python scripts/run_sprint1_baseline.py
 jupyter notebook notebooks/01_eda.ipynb
 ```
 
+## Sprint 2 – Kedro pipeline
+
+W ramach Sprintu 2 projekt został rozszerzony o pipeline w frameworku Kedro do przetwarzania danych i trenowania modelu klasyfikacyjnego przewidującego satysfakcję pasażerów.
+
+Pipeline obejmuje:
+- preprocessing danych
+- podział na train / validation / test
+- trenowanie modelu RandomForest
+- ewaluację modelu
+
+### Uruchomienie
+```bash
+pip install -r requirements.txt
+kedro run
+
 Domyslne sciezki:
 - baza SQLite: `data/01_raw/dataset.db`
 - metryki: `reports/metrics/baseline_metrics.json`
