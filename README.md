@@ -39,7 +39,7 @@ jupyter notebook notebooks/01_eda.ipynb
 W ramach Sprintu 2 projekt został rozszerzony o pipeline w frameworku Kedro do przetwarzania danych i trenowania modelu klasyfikacyjnego przewidującego satysfakcję pasażerów.
 
 Pipeline obejmuje:
-- preprocessing danych
+- przetwarzanie danych
 - podział na train / validation / test
 - trenowanie modelu RandomForest
 - ewaluację modelu
