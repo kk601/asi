@@ -27,3 +27,6 @@ wandb/
 .DS_Store
 
 info/
+
+# Kedro
+info.log
