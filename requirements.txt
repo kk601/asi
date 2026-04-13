@@ -6,3 +6,4 @@ notebook>=7.5
 pandas>=2.0, <3.0
 scikit-learn>=1.8
 matplotlib>=3.10
+seaborn>0.13
