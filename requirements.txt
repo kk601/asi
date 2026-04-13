@@ -7,3 +7,4 @@ pandas>=2.0, <3.0
 scikit-learn>=1.8
 matplotlib>=3.10
 seaborn>0.13
+wandb>=0.25
