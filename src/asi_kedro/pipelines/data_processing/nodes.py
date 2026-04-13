@@ -109,6 +109,7 @@ def train_model(
     model = RandomForestClassifier(
         n_estimators=model_params["n_estimators"],
         random_state=model_params["random_state"],
+        max_depth=model_params["max_depth"]
     )
     model.fit(X_train, y_train)
 
@@ -128,10 +129,11 @@ def evaluate_and_log(
     run = wandb.init(
             project=os.getenv("WANDB_PROJECT", "asi-airline"),
             entity=os.getenv("WANDB_ENTITY"),
-            name=f"rf-n{parameters['model']['n_estimators']}-default",
+            name=f"rf-n{parameters['model']['n_estimators']}-n{parameters['model']['max_depth']}",
             config={
                 "model_type": "RandomForest",
                 "n_estimators": parameters["model"]["n_estimators"],
+                "max_depth": parameters["model"]["max_depth"],
                 "random_state": parameters["model"]["random_state"],
                 "test_size":    parameters["split"]["test_size"],
             },
