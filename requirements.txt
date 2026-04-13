@@ -8,3 +8,4 @@ scikit-learn>=1.8
 matplotlib>=3.10
 seaborn>0.13
 wandb>=0.25
+python-dotenv>=1.2

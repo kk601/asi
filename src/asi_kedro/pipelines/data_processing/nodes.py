@@ -5,9 +5,14 @@ import sqlite3
 from typing import Any, Dict, Tuple
 
 import pandas as pd
+import wandb
+import os
+from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -111,10 +116,28 @@ def train_model(
     return model
 
 
-def evaluate_model(
-    model: RandomForestClassifier, X_val: pd.DataFrame, y_val: pd.Series
+def evaluate_and_log(
+    model: Any,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    parameters: Dict[str, Any],
 ) -> Dict[str, float]:
-    """Evaluate the model on validation data."""
+    """Evaluate the model on validation data and log results to Weights & Biases."""
+
+    # Initialize Weights & Biases
+    run = wandb.init(
+            project=os.getenv("WANDB_PROJECT", "asi-airline"),
+            entity=os.getenv("WANDB_ENTITY"),
+            name=f"rf-n{parameters['model']['n_estimators']}-default",
+            config={
+                "model_type": "RandomForest",
+                "n_estimators": parameters["model"]["n_estimators"],
+                "random_state": parameters["model"]["random_state"],
+                "test_size":    parameters["split"]["test_size"],
+            },
+            tags=["baseline", "sklearn"],
+        )
+
     y_pred = model.predict(X_val)
 
     metrics = {
@@ -124,11 +147,33 @@ def evaluate_model(
         "f1": float(f1_score(y_val, y_pred)),
     }
 
+    # Log metrics to Weights & Biases
+    wandb.log(metrics)
+
+    # Log feature importances if available
+    if hasattr(model, "feature_importances_"):
+        wandb.sklearn.plot_feature_importances(
+            model, feature_names=list(X_val.columns)
+        )
+
+    # Log the model as an artifact
+    artifact = wandb.Artifact(
+        name="baseline-model",
+        type="model",
+        description=f"RandomForest n={parameters['model']['n_estimators']}",
+    )
+    artifact.add_file("data/06_models/baseline_model.pkl")
+    wandb.log_artifact(artifact)
+
+    # Finish the run
+    wandb.finish()
+
     logger.info(
-        "Validation metrics -> accuracy=%.4f precision=%.4f recall=%.4f f1=%.4f",
+        "Run finished and logged to Weights & Biases. Validation metrics -> accuracy=%.4f precision=%.4f recall=%.4f f1=%.4f",
         metrics["accuracy"],
         metrics["precision"],
         metrics["recall"],
         metrics["f1"],
     )
+
     return metrics
