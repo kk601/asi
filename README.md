@@ -63,7 +63,7 @@ Zmienne srodowiskowe sa opisane w `.env.example`.
 
 ### Zakres sprintu 3:
 
-Cel został wykonany i pipeline Kedro został zintegrowany z W&B i loguje parametry, metryki i artefakty przy każdym kedro run.
+Pipeline Kedro został zintegrowany z W&B i loguje parametry, metryki oraz artefakty przy każdym kedro run.
 
 Dostarczono:
 - W&B zintegrowane z pipeline'em
