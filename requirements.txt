@@ -1,4 +1,7 @@
 ipython>=8.10
 jupyterlab>=3.0
 kedro~=0.19.9
-notebook
+kedro-datasets[text]~=7.0, <9.0
+notebook>=7.5
+pandas>=2.0, <3.0
+scikit-learn>=1.8
