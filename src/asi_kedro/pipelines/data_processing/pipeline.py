@@ -2,7 +2,7 @@
 
 from kedro.pipeline import Pipeline, node, pipeline
 
-from .nodes import evaluate_model, preprocess, split_data, train_model
+from .nodes import evaluate_and_log, preprocess, split_data, train_model
 
 
 def create_pipeline(**kwargs) -> Pipeline:
@@ -27,8 +27,8 @@ def create_pipeline(**kwargs) -> Pipeline:
                 name="train_model_node",
             ),
             node(
-                func=evaluate_model,
-                inputs=["trained_model", "X_val", "y_val"],
+                func=evaluate_and_log,
+                inputs=["trained_model", "X_val", "y_val", "parameters"],
                 outputs="metrics",
                 name="evaluate_model_node",
             ),

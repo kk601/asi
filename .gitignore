@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 .ipynb_checkpoints/
+.venv/
+venv/
 
 # Środowisko
 .env
@@ -25,3 +27,6 @@ wandb/
 .DS_Store
 
 info/
+
+# Kedro
+info.log

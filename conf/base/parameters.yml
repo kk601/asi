@@ -8,3 +8,4 @@ split:
 model:
   n_estimators: 100
   random_state: 42
+  max_depth: 10
