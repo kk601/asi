@@ -1,6 +1,7 @@
-db_path:
-  type: text.TextDataset
-  filepath: conf/base/db_path.txt
+airline_raw:
+  type: pandas.SQLTableDataset
+  table_name: airline_passenger_satisfaction
+  credentials: db_credentials
 
 X_train:
   type: pickle.PickleDataset

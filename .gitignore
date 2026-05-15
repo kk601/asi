@@ -30,3 +30,8 @@ info/
 
 # Kedro
 info.log
+
+# Kedro local config
+conf/local/**
+!conf/local/.gitkeep
+conf/**/*credentials*

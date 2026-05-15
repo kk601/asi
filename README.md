@@ -4,7 +4,7 @@ Projekt zaliczeniowy dla przedmiotu MLOps oparty na zbiorze **Airline Passenger 
 
 ## Wymagania wstępne
 
-1. Zainstalowany Python > 3.0
+1. Zainstalowany Python > 3.10
 2. Wykonanie `python -m pip install -r requirements.txt`
 3. Pobrany dataset [Airline Passenger Satisfaction](https://www.kaggle.com/datasets/mysarahmadbhat/airline-passenger-satisfaction)
 
@@ -18,7 +18,7 @@ Projekt zaliczeniowy dla przedmiotu MLOps oparty na zbiorze **Airline Passenger 
 
 ### Uruchomienie:
 
-1. Zaladuj dane do SQLite:
+1. Załaduj dane do SQLite:
 
 ```
 python scripts/load_airline_data_to_sqlite.py --source "<ścieżka do pobranego dataset>.csv"
@@ -30,7 +30,7 @@ python scripts/load_airline_data_to_sqlite.py --source "<ścieżka do pobranego 
 python scripts/run_sprint1_baseline.py
 ```
 
-3. Otworz notebook:
+3. Otwórz notebook:
 
 ```
 jupyter notebook notebooks/01_eda.ipynb
@@ -53,11 +53,9 @@ Pipeline obejmuje:
 kedro run
 ```
 
-Domyslne sciezki:
-- baza SQLite: `data/01_raw/dataset.db`
-- metryki: `reports/metrics/baseline_metrics.json`
-
-Zmienne srodowiskowe sa opisane w `.env.example`.
+Dane wejściowe są ładowane przez Kedro Data Catalog (`airline_raw` →
+`pandas.SQLTableDataset`) z bazy SQLite wskazanej w credentials.
+Zmienne środowiskowe są opisane w `.env.example`.
 
 ## Sprint 3 – Weights & Biases
 

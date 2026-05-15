@@ -1,12 +1,13 @@
 """Nodes for the data_processing pipeline."""
 
 import logging
-import sqlite3
+import os
+import warnings
 from typing import Any, Dict, Tuple
 
+import numpy as np
 import pandas as pd
 import wandb
-import os
 from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
@@ -17,13 +18,26 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-def preprocess(db_path: str, parameters: Dict[str, Any]) -> pd.DataFrame:
-    """Load data from SQLite, clean it and encode categorical columns."""
-    db_path = db_path.strip()
-    query = "SELECT * FROM airline_passenger_satisfaction"
+def preprocess(
+    data: pd.DataFrame,
+    target_column: str,
+    split_params: Dict[str, Any],
+) -> pd.DataFrame:
+    """Clean dataset and encode categorical columns.
 
-    with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(query, conn)
+    Args:
+        data: Raw dataframe loaded by the Kedro Data Catalog
+            (``airline_raw`` → ``pandas.SQLTableDataset``).
+        target_column: Name of the target column (e.g. ``"satisfaction"``).
+        split_params: Sub-dict from parameters.yml; only ``random_state``
+            is used here, as a seed for any non-deterministic step.
+
+    Returns:
+        Cleaned, fully numeric dataframe ready for ``split_data``.
+    """
+    np.random.seed(split_params.get("random_state", 42))
+
+    df = data.copy()
 
     # Ujednolicenie nazw kolumn
     df.columns = (
@@ -50,7 +64,7 @@ def preprocess(db_path: str, parameters: Dict[str, Any]) -> pd.DataFrame:
     df = df.dropna()
     logger.info("Removed %d rows with missing values", before - len(df))
 
-    target = parameters["target_column"].strip().lower().replace(" ", "_")
+    target = target_column.strip().lower().replace(" ", "_")
 
     categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
     for col in categorical_cols:
@@ -65,11 +79,21 @@ def preprocess(db_path: str, parameters: Dict[str, Any]) -> pd.DataFrame:
 
 
 def split_data(
-    data: pd.DataFrame, parameters: Dict[str, Any]
+    data: pd.DataFrame,
+    target_column: str,
+    split_params: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
-    """Split the dataset into train, validation and test subsets."""
-    target = parameters["target_column"].strip().lower().replace(" ", "_")
-    split_params = parameters["split"]
+    """Split the dataset into train, validation and test subsets.
+
+    Args:
+        data: Output of ``preprocess`` (fully numeric dataframe).
+        target_column: Name of the target column.
+        split_params: ``{"test_size": float, "val_ratio": float, "random_state": int}``.
+
+    Returns:
+        ``(X_train, X_val, X_test, y_train, y_val, y_test)``.
+    """
+    target = target_column.strip().lower().replace(" ", "_")
 
     X = data.drop(columns=[target])
     y = data[target]
@@ -101,15 +125,24 @@ def split_data(
 
 
 def train_model(
-    X_train: pd.DataFrame, y_train: pd.Series, parameters: Dict[str, Any]
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    model_params: Dict[str, Any],
 ) -> RandomForestClassifier:
-    """Train a RandomForestClassifier."""
-    model_params = parameters["model"]
+    """Train a RandomForestClassifier.
 
+    Args:
+        X_train: Training features.
+        y_train: Training target.
+        model_params: ``{"n_estimators": int, "max_depth": int|None, "random_state": int}``.
+
+    Returns:
+        Fitted RandomForestClassifier.
+    """
     model = RandomForestClassifier(
         n_estimators=model_params["n_estimators"],
         random_state=model_params["random_state"],
-        max_depth=model_params["max_depth"]
+        max_depth=model_params["max_depth"],
     )
     model.fit(X_train, y_train)
 
@@ -121,57 +154,73 @@ def evaluate_and_log(
     model: Any,
     X_val: pd.DataFrame,
     y_val: pd.Series,
-    parameters: Dict[str, Any],
+    model_params: Dict[str, Any],
+    split_params: Dict[str, Any],
 ) -> Dict[str, float]:
-    """Evaluate the model on validation data and log results to Weights & Biases."""
+    """Evaluate the model on validation data and log results to Weights & Biases.
 
-    # Initialize Weights & Biases
-    run = wandb.init(
-            project=os.getenv("WANDB_PROJECT", "asi-airline"),
-            entity=os.getenv("WANDB_ENTITY"),
-            name=f"rf-n{parameters['model']['n_estimators']}-n{parameters['model']['max_depth']}",
-            config={
-                "model_type": "RandomForest",
-                "n_estimators": parameters["model"]["n_estimators"],
-                "max_depth": parameters["model"]["max_depth"],
-                "random_state": parameters["model"]["random_state"],
-                "test_size":    parameters["split"]["test_size"],
-            },
-            tags=["baseline", "sklearn"],
+    Args:
+        model: Trained scikit-learn classifier.
+        X_val: Validation features.
+        y_val: Validation target.
+        model_params: Sub-dict ``{"n_estimators", "max_depth", "random_state"}``.
+        split_params: Sub-dict ``{"test_size", "val_ratio", "random_state"}``.
+
+    Returns:
+        Dict with validation metrics (accuracy, precision, recall, f1).
+    """
+    # Inicjalizacja W&B przez context manager — gwarancja wandb.finish() przy wyjątku.
+    # WANDB_API_KEY, WANDB_ENTITY, WANDB_PROJECT odczytywane są z .env.
+    with wandb.init(
+        project=os.getenv("WANDB_PROJECT", "asi-airline"),
+        entity=os.getenv("WANDB_ENTITY"),
+        name=f"rf-n{model_params['n_estimators']}-d{model_params['max_depth']}",
+        config={
+            "model_type": "RandomForest",
+            "n_estimators": model_params["n_estimators"],
+            "max_depth": model_params["max_depth"],
+            "random_state": model_params["random_state"],
+            "test_size": split_params["test_size"],
+        },
+        tags=["baseline", "sklearn"],
+    ) as run:
+        y_pred = model.predict(X_val)
+
+        # zero_division=0 chroni przed warningiem gdy klasa nie występuje w predykcji
+        metrics = {
+            "accuracy": float(accuracy_score(y_val, y_pred)),
+            "precision": float(precision_score(y_val, y_pred, zero_division=0)),
+            "recall": float(recall_score(y_val, y_pred, zero_division=0)),
+            "f1": float(f1_score(y_val, y_pred, zero_division=0)),
+        }
+
+        wandb.log(metrics)
+
+        # Wandb wewnątrz plot_feature_importances konwertuje DataFrame do np.array,
+        # co wywołuje sklearn warning "X does not have valid feature names".
+        # Tłumimy tylko ten konkretny warning lokalnie, na czas wywołania.
+        if hasattr(model, "feature_importances_"):
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="X does not have valid feature names",
+                    category=UserWarning,
+                )
+                wandb.sklearn.plot_feature_importances(
+                    model, feature_names=list(X_val.columns)
+                )
+
+        artifact = wandb.Artifact(
+            name="baseline-model",
+            type="model",
+            description=f"RandomForest n={model_params['n_estimators']}",
         )
-
-    y_pred = model.predict(X_val)
-
-    metrics = {
-        "accuracy": float(accuracy_score(y_val, y_pred)),
-        "precision": float(precision_score(y_val, y_pred)),
-        "recall": float(recall_score(y_val, y_pred)),
-        "f1": float(f1_score(y_val, y_pred)),
-    }
-
-    # Log metrics to Weights & Biases
-    wandb.log(metrics)
-
-    # Log feature importances if available
-    if hasattr(model, "feature_importances_"):
-        wandb.sklearn.plot_feature_importances(
-            model, feature_names=list(X_val.columns)
-        )
-
-    # Log the model as an artifact
-    artifact = wandb.Artifact(
-        name="baseline-model",
-        type="model",
-        description=f"RandomForest n={parameters['model']['n_estimators']}",
-    )
-    artifact.add_file("data/06_models/baseline_model.pkl")
-    wandb.log_artifact(artifact)
-
-    # Finish the run
-    wandb.finish()
+        artifact.add_file("data/06_models/baseline_model.pkl")
+        run.log_artifact(artifact)
 
     logger.info(
-        "Run finished and logged to Weights & Biases. Validation metrics -> accuracy=%.4f precision=%.4f recall=%.4f f1=%.4f",
+        "Run finished and logged to Weights & Biases. "
+        "Validation metrics -> accuracy=%.4f precision=%.4f recall=%.4f f1=%.4f",
         metrics["accuracy"],
         metrics["precision"],
         metrics["recall"],
