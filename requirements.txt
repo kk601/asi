@@ -11,3 +11,4 @@ seaborn>=0.13
 wandb>=0.25.1
 python-dotenv>=1.2
 numpy>=1.24
+autogluon.tabular>=1.1
