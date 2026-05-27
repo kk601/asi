@@ -12,5 +12,5 @@ model:
 
 automl:
   presets: "medium_quality"
-  time_limit: 120
+  time_limit: 60
   eval_metric: "f1"
