@@ -9,3 +9,8 @@ model:
   n_estimators: 100
   random_state: 42
   max_depth: 10
+
+automl:
+  presets: "medium_quality"
+  time_limit: 60
+  eval_metric: "f1"

@@ -78,3 +78,30 @@ Dostarczono:
 - `WANDB_ENTITY`
 2. Ustawienie konfiguracji pipeline w `conf/base/parameters.yml`
 3. `kedro run`
+
+## Sprint 4 – AutoML z AutoGluon
+
+### Zakres sprintu 4:
+
+Projekt został rozszerzony o osobny pipeline `automl`, który wykorzystuje AutoGluon do automatycznego trenowania i porównywania wielu modeli klasyfikacyjnych dla problemu przewidywania satysfakcji pasażerów.
+
+Pipeline `automl` korzysta z danych przygotowanych przez istniejący pipeline `data_processing`, czyli z tych samych zbiorów `X_train`, `X_val`, `y_train`, `y_val`, które były używane dla modelu baseline.
+
+Dostarczono:
+- nowy pipeline Kedro `automl`
+- trening modelu AutoGluon `TabularPredictor`
+- konfigurację AutoGluon w `conf/base/parameters.yml`
+- zapis predyktora AutoGluon do katalogu `data/06_models/autogluon/`
+- logowanie metryk do Weights & Biases
+- logowanie leaderboardu AutoGluon jako tabela W&B
+- porównanie modelu baseline RandomForest z modelem AutoML
+- możliwość uruchomienia całości przez pipeline `full`
+
+### Konfiguracja AutoGluon:
+
+Parametry AutoGluon znajdują się w pliku: `pip install -r requirements.txt`
+
+### Uruchomienie:
+1. Podstawowy pipeline : `kedro run`
+2. Pipeline AutoML: `kedro run --pipeline=automl`
+3. Pełny pipeline (opcjonalnie): `kedro run --pipeline=full`

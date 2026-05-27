@@ -93,6 +93,8 @@ def split_data(
     Returns:
         ``(X_train, X_val, X_test, y_train, y_val, y_test)``.
     """
+    data.columns = [f"{column}" for column in data.columns]
+
     target = target_column.strip().lower().replace(" ", "_")
 
     X = data.drop(columns=[target])
