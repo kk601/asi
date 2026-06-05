@@ -16,6 +16,7 @@ data/
 *.pkl
 AutogluonModels/
 data/06_models/autogluon/
+airline_passenger_satisfaction.csv
 
 # W&B
 wandb/
