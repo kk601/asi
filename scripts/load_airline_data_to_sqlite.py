@@ -87,14 +87,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_rows(source_path: Path) -> list[tuple[str, ...]]:
+def load_rows(source_path: Path) -> list[tuple[str | None, ...]]:
     """Read CSV rows in the expected column order."""
     with source_path.open("r", encoding="utf-8", newline="") as csv_file:
         reader = csv.DictReader(csv_file)
         missing_columns = [column for column in COLUMNS if column not in reader.fieldnames]
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
-        return [tuple(row[column] for column in COLUMNS) for row in reader]
+        
+        # Zamieniamy puste stringi na wartość None, żeby SQLite zapisał je jako NULL
+        return [tuple(None if row[column] == "" else row[column] for column in COLUMNS) for row in reader]
 
 
 def write_sqlite(rows: list[tuple[str, ...]], database_path: Path) -> None:
