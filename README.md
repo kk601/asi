@@ -121,7 +121,7 @@ Dostarczono:
 - odpowiednią obsługę błędów (np. zwracanie 422 Unprocessable Entity dla złych danych oraz 503 Service Unavailable w przypadku braku załadowanego modelu)
 - automatycznie generowaną, interaktywną dokumentację Swagger UI
 
-## Uruchomienie:
+### Uruchomienie:
 1. Upewnij się, że posiadasz wygenerowany plik z wytrenowanym modelem (zapisany uprzednio przez Kedro w odpowiednim folderze `data/`).
 2. Uruchom serwer pomocą uvicorn, wskazując plik i instancję aplikacji: `uvicorn api.main:app --reload`
 3. Aplikacja uruchomi się na porcie 8000. Endpointy można testować poprzez graficzny interfejs Swagger UI pod adresem:
