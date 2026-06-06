@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Nie udało się załadować modelu AutoGluon: {e}")
 
-    if models["satisfaction_model"] is None and BASELINE_MODEL_PATH.exists():
+    if models.get("satisfaction_model") is None and BASELINE_MODEL_PATH.exists():
         try:
             with open(BASELINE_MODEL_PATH, "rb") as f:
                 models["satisfaction_model"] = pickle.load(f)
@@ -95,11 +95,11 @@ class PassengerData(BaseModel):
 
 
 @app.get("/health")
-def health_check():
+def health_check() -> dict:
     """
     Sprawdza stan API. Wyrzuca błąd 503, jeśli żaden model nie jest załadowany.
     """
-    if models["satisfaction_model"] is None:
+    if models.get("satisfaction_model") is None:
         raise HTTPException(
             status_code=503, 
             detail="Service Unavailable: No machine learning models are currently loaded."
@@ -113,7 +113,7 @@ def health_check():
 
 
 @app.post("/predict")
-def predict(data: PassengerData):
+def predict(data: PassengerData) -> dict:
     """
     Endpoint wykonujący predykcję na podstawie przekazanych danych pasażera.
     """
