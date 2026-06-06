@@ -97,18 +97,13 @@ class PassengerData(BaseModel):
 @app.get("/health")
 def health_check() -> dict:
     """
-    Sprawdza stan API. Wyrzuca błąd 503, jeśli żaden model nie jest załadowany.
+    Sprawdza stan API i status załadowanych modeli
     """
-    if models.get("satisfaction_model") is None:
-        raise HTTPException(
-            status_code=503, 
-            detail="Service Unavailable: No machine learning models are currently loaded."
-        )
     
     return {
         "status": "ok",
-        "model_loaded": True,
-        "active_model_type": models["model_type"]
+        "model_loaded": "satisfaction_model" in models,
+        "active_model_type": models.get("model_type", "None")
     }
 
 
@@ -118,6 +113,7 @@ def predict(data: PassengerData) -> dict:
     Endpoint wykonujący predykcję na podstawie przekazanych danych pasażera.
     """
     model = models.get("satisfaction_model")
+    model_type = models.get("model_type")
     
     # 503 Service Unavailable, jeśli model nie jest załadowany
     if model is None:
@@ -139,6 +135,14 @@ def predict(data: PassengerData) -> dict:
         # Normalizacja autoGluon - sklearn
         pred_val = prediction.iloc[0] if hasattr(prediction, "iloc") else prediction[0]
 
-        return {"prediction": str(pred_val)}
+        if model_type == "AutoGluon":
+            exact_model_name = model.model_best
+        else:
+            exact_model_name = f"Baseline_{type(model).__name__}"
+
+        return {
+            "prediction": str(pred_val), 
+            "model": exact_model_name
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
