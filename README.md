@@ -105,3 +105,24 @@ Parametry AutoGluon znajdują się w pliku: `pip install -r requirements.txt`
 1. Podstawowy pipeline : `kedro run`
 2. Pipeline AutoML: `kedro run --pipeline=automl`
 3. Pełny pipeline (opcjonalnie): `kedro run --pipeline=full`
+
+## Sprint 5 – REST API z FastAPI
+
+### Zakres sprintu 5:
+W ramach Sprintu 5 projekt został rozszerzony o interfejs REST API, który pozwala na serwowanie wytrenowanego modelu klasyfikacyjnego i dokonywanie predykcji w czasie rzeczywistym przez sieć, bez konieczności uruchamiania całego środowiska Kedro.
+
+Dostarczono:
+
+- aplikację opartą o framework FastAPI (w katalogu api/)
+- endpoint GET /health zwracający status serwera oraz informację o załadowanym modelu
+- endpoint POST /predict przyjmujący dane o pasażerze w formacie JSON i zwracający wynik predykcji
+- rygorystyczną walidację danych wejściowych za pomocą biblioteki Pydantic (wymuszanie odpowiednich typów, aliasy,ograniczenia dziedziny np. wiek 1-120, skale ankiet 0-5)
+- optymalizację cyklu życia aplikacji (model deserializowany do pamięci tylko raz, podczas startu serwera)
+- odpowiednią obsługę błędów (np. zwracanie 422 Unprocessable Entity dla złych danych oraz 503 Service Unavailable w przypadku braku załadowanego modelu)
+- automatycznie generowaną, interaktywną dokumentację Swagger UI
+
+## Uruchomienie:
+1. Upewnij się, że posiadasz wygenerowany plik z wytrenowanym modelem (zapisany uprzednio przez Kedro w odpowiednim folderze `data/`).
+2. Uruchom serwer pomocą uvicorn, wskazując plik i instancję aplikacji: `uvicorn api.main:app --reload`
+3. Aplikacja uruchomi się na porcie 8000. Endpointy można testować poprzez graficzny interfejs Swagger UI pod adresem:
+http://127.0.0.1:8000/docs
