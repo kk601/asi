@@ -1,31 +1,48 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 import pickle
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
 import pandas as pd
 from typing import Literal
+from autogluon.tabular import TabularPredictor
 
 models = {}
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = BASE_DIR / "data" / "06_models" / "baseline_model.pkl"
-
+AUTOML_MODEL_PATH = BASE_DIR / "data" / "06_models" / "autogluon"
+BASELINE_MODEL_PATH = BASE_DIR / "data" / "06_models" / "baseline_model.pkl"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Funkcja uruchamiana przy starcie i zamykaniu aplikacji.
-    Model jest ładowany do pamięci tylko raz.
+    Najpierw próbuje załadować model AutoGluon. Jeśli go nie ma lub wystąpi błąd,
+    przechodzi do ładowania modelu baseline (fallback).
     """
-    if MODEL_PATH.exists():
-        with open(MODEL_PATH, "rb") as f:
-            models["satisfaction_model"] = pickle.load(f)
-        print(f"Model załadowany pomyślnie z {MODEL_PATH}")
-    else:
-        models["satisfaction_model"] = None
-        print(f"Nie znaleziono modelu pod ścieżką {MODEL_PATH}")
+
+    if AUTOML_MODEL_PATH.exists():
+        try:
+            models["satisfaction_model"] = TabularPredictor.load(str(AUTOML_MODEL_PATH))
+            models["model_type"] = "AutoGluon"
+            logger.info(f"Pomyślnie załadowano model AutoGluon z {AUTOML_MODEL_PATH}")
+        except Exception as e:
+            logger.error(f"Nie udało się załadować modelu AutoGluon: {e}")
+
+    if models["satisfaction_model"] is None and BASELINE_MODEL_PATH.exists():
+        try:
+            with open(BASELINE_MODEL_PATH, "rb") as f:
+                models["satisfaction_model"] = pickle.load(f)
+            models["model_type"] = "Baseline"
+            logger.info(f"Pomyślnie załadowano model baseline (fallback) z {BASELINE_MODEL_PATH}")
+        except Exception as e:
+            logger.error(f"Nie udało się załadować modelu baseline: {e}")
     
+    if models["satisfaction_model"] is None:
+        logger.warning("Nie załadowano żadnego modelu")
+
     yield
     
     # Czyszczenie zasobów przy wyłączaniu serwera
@@ -35,7 +52,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Airline Passenger Satisfaction API",
     description="REST API do przewidywania satysfakcji pasażerów linii lotniczych.",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -80,13 +97,18 @@ class PassengerData(BaseModel):
 @app.get("/health")
 def health_check():
     """
-    Endpoint sprawdzający stan API. Zwraca status i informację o załadowanym modelu.
+    Sprawdza stan API. Wyrzuca błąd 503, jeśli żaden model nie jest załadowany.
     """
-    model_loaded = models.get("satisfaction_model") is not None
+    if models["satisfaction_model"] is None:
+        raise HTTPException(
+            status_code=503, 
+            detail="Service Unavailable: No machine learning models are currently loaded."
+        )
+    
     return {
         "status": "ok",
-        "model_loaded": model_loaded,
-        "model_name": MODEL_PATH.name if model_loaded else None
+        "model_loaded": True,
+        "active_model_type": models["model_type"]
     }
 
 
@@ -113,6 +135,10 @@ def predict(data: PassengerData):
     try:
         # Predykcja modelem
         prediction = model.predict(input_df)
-        return {"prediction": str(prediction[0])}
+
+        # Normalizacja autoGluon - sklearn
+        pred_val = prediction.iloc[0] if hasattr(prediction, "iloc") else prediction[0]
+
+        return {"prediction": str(pred_val)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
