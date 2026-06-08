@@ -99,11 +99,20 @@ def health_check() -> dict:
     """
     Sprawdza stan API i status załadowanych modeli
     """
+    model = models.get("satisfaction_model")
+    model_type = models.get("model_type", "None")
+    
+    exact_model_name = "None"
+    if model is not None:
+        if model_type == "AutoGluon":
+            exact_model_name = model.model_best
+        else:
+            exact_model_name = f"Baseline_{type(model).__name__}"
     
     return {
         "status": "ok",
-        "model_loaded": "satisfaction_model" in models,
-        "active_model_type": models.get("model_type", "None")
+        "model_loaded": model is not None,
+        "model_name": exact_model_name
     }
 
 
