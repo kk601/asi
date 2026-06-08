@@ -169,6 +169,8 @@ def train_model(
 
     pipeline.fit(X_train, y_train)
 
+    pipeline.name = f"rf-n{model_params['n_estimators']}-d{model_params['max_depth']}"
+
     logger.info("Pipeline training finished")
     return pipeline
 
@@ -193,10 +195,13 @@ def evaluate_and_log(
     """
     # Inicjalizacja W&B przez context manager — gwarancja wandb.finish() przy wyjątku.
     # WANDB_API_KEY, WANDB_ENTITY, WANDB_PROJECT odczytywane są z .env.
+
+    run_name = getattr(model, "name")
+
     with wandb.init(
         project=os.getenv("WANDB_PROJECT", "asi-airline"),
         entity=os.getenv("WANDB_ENTITY"),
-        name=f"rf-n{model_params['n_estimators']}-d{model_params['max_depth']}",
+        name=run_name,
         config={
             "model_type": "RandomForestPipeline",
             "n_estimators": model_params["n_estimators"],
@@ -247,7 +252,7 @@ def evaluate_and_log(
         artifact = wandb.Artifact(
             name="baseline-model-pipeline",
             type="model",
-            description=f"RandomForest Pipeline n={model_params['n_estimators']}",
+            description=f"Pipeline: {run_name}",
         )
         artifact.add_file("data/06_models/baseline_model.pkl")
         run.log_artifact(artifact)

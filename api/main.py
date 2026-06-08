@@ -107,7 +107,10 @@ def health_check() -> dict:
         if model_type == "AutoGluon":
             exact_model_name = model.model_best
         else:
-            exact_model_name = f"Baseline_{type(model).__name__}"
+            if hasattr(model, "name"):
+                exact_model_name = model.name
+            else:
+                exact_model_name = f"Baseline_{type(model).__name__}"
     
     return {
         "status": "ok",
@@ -147,7 +150,10 @@ def predict(data: PassengerData) -> dict:
         if model_type == "AutoGluon":
             exact_model_name = model.model_best
         else:
-            exact_model_name = f"Baseline_{type(model).__name__}"
+            if hasattr(model, "name"):
+                exact_model_name = model.name
+            else:
+                exact_model_name = f"Baseline_{type(model).__name__}"
 
         return {
             "prediction": str(pred_val), 
