@@ -9,6 +9,10 @@ import numpy as np
 import pandas as pd
 import wandb
 from dotenv import load_dotenv
+
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OrdinalEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
@@ -23,7 +27,7 @@ def preprocess(
     target_column: str,
     split_params: Dict[str, Any],
 ) -> pd.DataFrame:
-    """Clean dataset and encode categorical columns.
+    """Clean dataset and encode ONLY the target categorical column.
 
     Args:
         data: Raw dataframe loaded by the Kedro Data Catalog
@@ -33,7 +37,7 @@ def preprocess(
             is used here, as a seed for any non-deterministic step.
 
     Returns:
-        Cleaned, fully numeric dataframe ready for ``split_data``.
+        Cleaned dataframe ready for ``split_data``.
     """
     np.random.seed(split_params.get("random_state", 42))
 
@@ -66,12 +70,8 @@ def preprocess(
 
     target = target_column.strip().lower().replace(" ", "_")
 
-    categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
-    for col in categorical_cols:
-        if col != target:
-            df[col] = df[col].astype("category").cat.codes
-
-    if df[target].dtype == "object":
+    # Encode ONLY the target variable so split_data can stratify correctly
+    if df[target].dtype == "object" or pd.api.types.is_categorical_dtype(df[target]):
         df[target] = df[target].astype("category").cat.codes
 
     logger.info("Preprocessing finished. Final shape: %s", df.shape)
@@ -93,6 +93,7 @@ def split_data(
     Returns:
         ``(X_train, X_val, X_test, y_train, y_val, y_test)``.
     """
+    data = data.drop(columns=["ID", "id"], errors="ignore")
     data.columns = [f"{column}" for column in data.columns]
 
     target = target_column.strip().lower().replace(" ", "_")
@@ -130,8 +131,8 @@ def train_model(
     X_train: pd.DataFrame,
     y_train: pd.Series,
     model_params: Dict[str, Any],
-) -> RandomForestClassifier:
-    """Train a RandomForestClassifier.
+) -> Pipeline:
+    """Create pipeline containing preprocessing and a RandomForestClassifier
 
     Args:
         X_train: Training features.
@@ -139,30 +140,51 @@ def train_model(
         model_params: ``{"n_estimators": int, "max_depth": int|None, "random_state": int}``.
 
     Returns:
-        Fitted RandomForestClassifier.
+        Fitted Scikit-Learn Pipeline.
     """
-    model = RandomForestClassifier(
+    categorical_cols = X_train.select_dtypes(include=["object", "category"]).columns.tolist()
+    numeric_cols = X_train.select_dtypes(exclude=["object", "category"]).columns.tolist()
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "cat", 
+                OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), 
+                categorical_cols
+            ),
+            ("num", "passthrough", numeric_cols),
+        ]
+    )
+
+    classifier = RandomForestClassifier(
         n_estimators=model_params["n_estimators"],
         random_state=model_params["random_state"],
         max_depth=model_params["max_depth"],
     )
-    model.fit(X_train, y_train)
 
-    logger.info("Model training finished")
-    return model
+    pipeline = Pipeline(steps=[
+        ("preprocessor", preprocessor),
+        ("classifier", classifier)
+    ])
+
+    pipeline.fit(X_train, y_train)
+
+    pipeline.name = f"rf-n{model_params['n_estimators']}-d{model_params['max_depth']}"
+
+    logger.info("Pipeline training finished")
+    return pipeline
 
 
 def evaluate_and_log(
-    model: Any,
+    model: Pipeline,
     X_val: pd.DataFrame,
     y_val: pd.Series,
     model_params: Dict[str, Any],
     split_params: Dict[str, Any],
 ) -> Dict[str, float]:
-    """Evaluate the model on validation data and log results to Weights & Biases.
-
+    """Evaluate the model pipeline on validation data and log results to Weights & Biases.
     Args:
-        model: Trained scikit-learn classifier.
+        model: Trained scikit-learn Pipeline.
         X_val: Validation features.
         y_val: Validation target.
         model_params: Sub-dict ``{"n_estimators", "max_depth", "random_state"}``.
@@ -173,18 +195,21 @@ def evaluate_and_log(
     """
     # Inicjalizacja W&B przez context manager — gwarancja wandb.finish() przy wyjątku.
     # WANDB_API_KEY, WANDB_ENTITY, WANDB_PROJECT odczytywane są z .env.
+
+    run_name = getattr(model, "name")
+
     with wandb.init(
         project=os.getenv("WANDB_PROJECT", "asi-airline"),
         entity=os.getenv("WANDB_ENTITY"),
-        name=f"rf-n{model_params['n_estimators']}-d{model_params['max_depth']}",
+        name=run_name,
         config={
-            "model_type": "RandomForest",
+            "model_type": "RandomForestPipeline",
             "n_estimators": model_params["n_estimators"],
             "max_depth": model_params["max_depth"],
             "random_state": model_params["random_state"],
             "test_size": split_params["test_size"],
         },
-        tags=["baseline", "sklearn"],
+        tags=["baseline", "sklearn", "pipeline"],
     ) as run:
         y_pred = model.predict(X_val)
 
@@ -198,24 +223,36 @@ def evaluate_and_log(
 
         wandb.log(metrics)
 
-        # Wandb wewnątrz plot_feature_importances konwertuje DataFrame do np.array,
-        # co wywołuje sklearn warning "X does not have valid feature names".
-        # Tłumimy tylko ten konkretny warning lokalnie, na czas wywołania.
-        if hasattr(model, "feature_importances_"):
+        # Extract the underlying classifier and preprocessor from the Pipeline
+        classifier = model.named_steps["classifier"]
+        preprocessor = model.named_steps["preprocessor"]
+
+        if hasattr(classifier, "feature_importances_"):
+            # Wandb wewnątrz plot_feature_importances konwertuje DataFrame do np.array,
+            # co wywołuje sklearn warning "X does not have valid feature names".
+            # Tłumimy tylko ten konkretny warning lokalnie, na czas wywołania.
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
                     message="X does not have valid feature names",
                     category=UserWarning,
                 )
+                # Attempt to get ordered feature names from the ColumnTransformer
+                try:
+                    feature_names = preprocessor.get_feature_names_out()
+                    # Clean up prefixes like 'cat__' and 'num__' added by ColumnTransformer
+                    feature_names = [name.split("__")[-1] for name in feature_names]
+                except AttributeError:
+                    feature_names = list(X_val.columns)
+
                 wandb.sklearn.plot_feature_importances(
-                    model, feature_names=list(X_val.columns)
+                    classifier, feature_names=feature_names
                 )
 
         artifact = wandb.Artifact(
-            name="baseline-model",
+            name="baseline-model-pipeline",
             type="model",
-            description=f"RandomForest n={model_params['n_estimators']}",
+            description=f"Pipeline: {run_name}",
         )
         artifact.add_file("data/06_models/baseline_model.pkl")
         run.log_artifact(artifact)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Load the Airline Passenger Satisfaction CSV into SQLite."""
+"""Load the Airline Passenger Satisfaction CSV into SQLite and generate credentials."""
 
 from __future__ import annotations
 
@@ -87,14 +87,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_rows(source_path: Path) -> list[tuple[str, ...]]:
+def load_rows(source_path: Path) -> list[tuple[str | None, ...]]:
     """Read CSV rows in the expected column order."""
     with source_path.open("r", encoding="utf-8", newline="") as csv_file:
         reader = csv.DictReader(csv_file)
         missing_columns = [column for column in COLUMNS if column not in reader.fieldnames]
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
-        return [tuple(row[column] for column in COLUMNS) for row in reader]
+        
+        # Zamieniamy puste stringi na wartość None, żeby SQLite zapisał je jako NULL
+        return [tuple(None if row[column] == "" else row[column] for column in COLUMNS) for row in reader]
 
 
 def write_sqlite(rows: list[tuple[str, ...]], database_path: Path) -> None:
@@ -116,18 +118,46 @@ def write_sqlite(rows: list[tuple[str, ...]], database_path: Path) -> None:
         connection.commit()
 
 
+def generate_credentials(database_path: Path, project_root: Path) -> None:
+    """Generate conf/local/credentials.yml with the SQLite connection string."""
+    credentials_dir = project_root / "conf" / "local"
+    credentials_dir.mkdir(parents=True, exist_ok=True)
+    credentials_path = credentials_dir / "credentials.yml"
+
+    # Wyliczanie ścieżki względnej, jeśli to możliwe
+    try:
+        rel_db_path = database_path.relative_to(project_root)
+        con_string = f"sqlite:///{rel_db_path}"
+    except ValueError:
+        # Fallback na pełną ścieżkę absolutną
+        con_string = f"sqlite:///{database_path}"
+
+    yaml_content = f"""db_credentials:
+  con: {con_string}
+"""
+    with credentials_path.open("w", encoding="utf-8") as file:
+        file.write(yaml_content)
+    print(f"Generated credentials at: {credentials_path}")
+
+
 def main() -> None:
     """Run the import script."""
     args = parse_args()
     source_path = args.source.resolve()
     database_path = args.database.resolve()
+    
+    project_root = Path(__file__).resolve().parent.parent
 
     if not source_path.exists():
         raise FileNotFoundError(f"Source CSV does not exist: {source_path}")
 
+    # Ładowanie danych
     rows = load_rows(source_path)
     write_sqlite(rows, database_path)
     print(f"Loaded {len(rows)} rows into {database_path}")
+    
+    # Generowanie domyślnych credentials dla kedro
+    generate_credentials(database_path, project_root)
 
 
 if __name__ == "__main__":
