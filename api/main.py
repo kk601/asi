@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Nie udało się załadować modelu baseline: {e}")
     
-    if models["satisfaction_model"] is None:
+    if models.get("satisfaction_model") is None:
         logger.warning("Nie załadowano żadnego modelu")
 
     yield
