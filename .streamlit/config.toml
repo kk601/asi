@@ -1,0 +1,6 @@
+[server]
+# Disable the local-sources file watcher: it introspects module paths and
+# chokes on PyTorch's torch.classes (RuntimeError), spamming the console when
+# the synthetic-data page imports SDV (which pulls in torch). The dashboard
+# doesn't need hot-reload, so turning the watcher off is the clean fix.
+fileWatcherType = "none"

@@ -15,6 +15,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 AUTOML_MODEL_PATH = BASE_DIR / "data" / "06_models" / "autogluon"
 BASELINE_MODEL_PATH = BASE_DIR / "data" / "06_models" / "baseline_model.pkl"
 
+# Mapowanie kodu klasy na czytelną etykietę.
+# Target koduje preprocess przez `astype("category").cat.codes`, które przypisuje
+# kody alfabetycznie: "Neutral or Dissatisfied" -> 0, "Satisfied" -> 1.
+LABEL_MAP = {0: "Neutral or Dissatisfied", 1: "Satisfied"}
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -64,9 +69,9 @@ class PassengerData(BaseModel):
     """
     # Zmienne kategoryczne
     Gender: Literal["Male", "Female"] = Field(..., description="Płeć (Male/Female)")
-    Customer_Type: Literal["Loyal Customer", "disloyal Customer"] = Field(..., alias="Customer Type")
-    Type_of_Travel: Literal["Personal Travel", "Business travel"] = Field(..., alias="Type of Travel")
-    Class: Literal["Eco", "Eco Plus", "Business"] = Field(...)
+    Customer_Type: Literal["Returning", "First-time"] = Field(..., alias="Customer Type")
+    Type_of_Travel: Literal["Business", "Personal"] = Field(..., alias="Type of Travel")
+    Class: Literal["Business", "Economy", "Economy Plus"] = Field(...)
     
     # Zmienne numeryczne
     Age: int = Field(..., ge=1, le=120, description="Wiek pasażera (1-120)")
@@ -155,8 +160,10 @@ def predict(data: PassengerData) -> dict:
             else:
                 exact_model_name = f"Baseline_{type(model).__name__}"
 
+        pred_code = int(pred_val)
         return {
-            "prediction": str(pred_val), 
+            "prediction": pred_code,
+            "prediction_label": LABEL_MAP.get(pred_code, "Unknown"),
             "model": exact_model_name
         }
     except Exception as e:

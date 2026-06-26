@@ -126,3 +126,18 @@ Dostarczono:
 2. Uruchom serwer pomocą uvicorn, wskazując plik i instancję aplikacji: `uvicorn api.main:app --reload`
 3. Aplikacja uruchomi się na porcie 8000. Endpointy można testować poprzez graficzny interfejs Swagger UI pod adresem:
 http://127.0.0.1:8000/docs
+
+## Sprint 6 – Streamlit + dane syntetyczne (SDV)
+
+### Zakres sprintu 6:
+- Dashboard Streamlit w `app/` (multipage): Predykcja, Dane, Dane syntetyczne
+- Komunikacja z REST API (sprint 5) przez HTTP; `API_URL` z konfiguracji (nie hardcoded)
+- Pipeline Kedro `synthetic`: generowanie (GaussianCopula) i ewaluacja (SDV) danych syntetycznych
+- Logowanie `diagnostic_score` i `quality_score` do Weights & Biases
+
+### Uruchomienie:
+1. Pipeline danych syntetycznych: `kedro run --pipeline=synthetic`
+2. API: `uvicorn api.main:app`
+3. Dashboard: `python -m streamlit run app/streamlit_app.py` (otwiera http://localhost:8501)
+
+Adres API ustawiasz zmienną środowiskową `API_URL` (domyślnie `http://127.0.0.1:8000`).
